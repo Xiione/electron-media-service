@@ -42,7 +42,8 @@ void DarwinMediaService::Emit(std::string eventName) {
 
 void DarwinMediaService::EmitWithInt(std::string eventName, int details) {
   v8::Local<v8::Value> argv[2] = {
-    v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), eventName.c_str()),
+    //v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), eventName.c_str()),
+    Nan::New(eventName).ToLocalChecked(),
     v8::Integer::New(v8::Isolate::GetCurrent(), details)
   };
 
