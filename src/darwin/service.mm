@@ -96,8 +96,8 @@ NAN_METHOD(DarwinMediaService::SetMetaData) {
   std::string songAlbum = *Nan::Utf8String(info[2]);
   std::string songState = *Nan::Utf8String(info[3]);
   std::string songID = *Nan::Utf8String(info[4]);
-  double currentTime = info[5]->NumberValue();
-  double duration = info[6]->NumberValue();
+  double currentTime = info[5]->NumberValue(Nan::GetCurrentContext()).ToChecked();
+  double duration = info[6]->NumberValue(Nan::GetCurrentContext()).ToChecked();
 
   std::string newPosterUrl;
   if (!info[7]->IsUndefined() && !info[7]->IsNull())
@@ -141,8 +141,11 @@ NAN_METHOD(DarwinMediaService::SetMetaData) {
     }
   }
 
-  if (artwork)
-    [songInfo setObject:artwork forKey:MPMediaItemPropertyArtwork];
+  if (@available(macOS 10.13.2, *))
+  {
+    if (artwork)
+      [songInfo setObject:artwork forKey:MPMediaItemPropertyArtwork];
+  }
 
   [[MPNowPlayingInfoCenter defaultCenter] setNowPlayingInfo:songInfo];
 }
