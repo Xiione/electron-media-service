@@ -11,14 +11,15 @@ static std::string trackID;
   _service = service;
 }
 
-- (void)remotePlay { _service->Emit("play"); }
-- (void)remotePause { _service->Emit("pause"); }
-- (void)remoteTogglePlayPause { _service->Emit("playPause"); }
-- (void)remoteNext { _service->Emit("next"); }
-- (void)remotePrev { _service->Emit("previous"); }
+- (MPRemoteCommandHandlerStatus)remotePlay { _service->Emit("play"); return MPRemoteCommandHandlerStatusSuccess; }
+- (MPRemoteCommandHandlerStatus)remotePause { _service->Emit("pause"); return MPRemoteCommandHandlerStatusSuccess; }
+- (MPRemoteCommandHandlerStatus)remoteTogglePlayPause { _service->Emit("playPause"); return MPRemoteCommandHandlerStatusSuccess; }
+- (MPRemoteCommandHandlerStatus)remoteNext { _service->Emit("next"); return MPRemoteCommandHandlerStatusSuccess; }
+- (MPRemoteCommandHandlerStatus)remotePrev { _service->Emit("previous"); return MPRemoteCommandHandlerStatusSuccess; }
 
-- (void)remoteChangePlaybackPosition:(MPChangePlaybackPositionCommandEvent*)event {
+- (MPRemoteCommandHandlerStatus)remoteChangePlaybackPosition:(MPChangePlaybackPositionCommandEvent*)event {
   _service->EmitWithInt("seek", event.positionTime);
+  return MPRemoteCommandHandlerStatusSuccess;
 }
 
 - (MPRemoteCommandHandlerStatus)move:(MPChangePlaybackPositionCommandEvent*)event {
@@ -27,13 +28,13 @@ static std::string trackID;
 
 @end
 
-// static Persistent<Function> persistentCallback;
-static Nan::Callback persistentCallback;
+static Nan::Persistent<v8::Function> persistentCallback;
+
 NAN_METHOD(DarwinMediaService::Hook) {
   Nan::ObjectWrap::Unwrap<DarwinMediaService>(info.This());
 
-  v8::Local<v8::Function> function = v8::Local<v8::Function>::Cast(info[0]);
-  persistentCallback.SetFunction(function);
+  v8::Local<v8::Function> cb = Nan::To<v8::Function>(info[0]).ToLocalChecked();
+  persistentCallback.Reset(cb);
 }
 
 void DarwinMediaService::Emit(std::string eventName) {
@@ -41,13 +42,18 @@ void DarwinMediaService::Emit(std::string eventName) {
 }
 
 void DarwinMediaService::EmitWithInt(std::string eventName, int details) {
+  v8::Isolate* isolate = v8::Isolate::GetCurrent();
+  v8::HandleScope handleScope(isolate);
+
   v8::Local<v8::Value> argv[2] = {
-    //v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), eventName.c_str()),
-    Nan::New(eventName).ToLocalChecked(),
-    v8::Integer::New(v8::Isolate::GetCurrent(), details)
+    Nan::New<v8::String>(eventName.c_str()).ToLocalChecked(),
+    Nan::New<v8::Integer>(details)
   };
 
-  persistentCallback.Call(2, argv);
+  v8::Local<v8::Function> callback = Nan::New(persistentCallback);
+
+  Nan::AsyncResource resource("auryo:addon.callback");
+  resource.runInAsyncScope(Nan::GetCurrentContext()->Global(), callback, 2, argv);
 }
 
 NAN_METHOD(DarwinMediaService::New) {
