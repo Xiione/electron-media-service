@@ -137,13 +137,36 @@ NAN_METHOD(DarwinMediaService::SetMetaData) {
   MPMediaItemArtwork* artwork = nil;
   if (!newPosterUrl.empty())
   {
-    NSString* path = [NSString stringWithUTF8String:newPosterUrl.c_str()];
-    NSImage* poster = [[NSImage alloc] initWithContentsOfFile:[path substringFromIndex:7]];
+    NSString* posterUrlStr = [NSString stringWithUTF8String:newPosterUrl.c_str()];
+    NSImage* poster = nil;
+    
+    if ([posterUrlStr hasPrefix:@"file://"])
+    {
+        // Handle file URLs: strip off "file://"
+        NSString* filePath = [posterUrlStr substringFromIndex:7];
+        poster = [[NSImage alloc] initWithContentsOfFile:filePath];
+    }
+    else if ([posterUrlStr hasPrefix:@"data:"])
+    {
+        // Handle base64 URLs, assuming the format "data:image/png;base64,<base64data>"
+        NSRange commaRange = [posterUrlStr rangeOfString:@","];
+        if (commaRange.location != NSNotFound)
+        {
+            NSString* base64DataStr = [posterUrlStr substringFromIndex:commaRange.location + 1];
+            NSData* imageData = [[NSData alloc] initWithBase64EncodedString:base64DataStr
+                                                                    options:NSDataBase64DecodingIgnoreUnknownCharacters];
+            if (imageData)
+            {
+                poster = [[NSImage alloc] initWithData:imageData];
+            }
+        }
+    }
+
     if (poster)
     {
-      artwork = [[MPMediaItemArtwork alloc] initWithBoundsSize:poster.size requestHandler:^NSImage* _Nonnull(CGSize size) {
-        return poster;
-      }];
+        artwork = [[MPMediaItemArtwork alloc] initWithBoundsSize:poster.size requestHandler:^NSImage* _Nonnull(CGSize size) {
+            return poster;
+        }];
     }
   }
 
